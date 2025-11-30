@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BugSquash - Issue Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c5c5c5; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 0.5);
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-overlay" onclick="app.toggleSidebar()" class="fixed inset-0 bg-black/50 z-20 hidden md:hidden transition-opacity"></div>
+
+    <!-- Sidebar -->
+    <!-- Updated classes for mobile responsiveness: fixed positioning with transform transition -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-slate-900 text-white flex flex-col shadow-xl z-30 transform -translate-x-full transition-transform duration-300 md:translate-x-0 md:static md:flex">
+        <div class="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+            <div class="flex items-center">
+                <i class="fa-solid fa-bug text-brand-500 text-xl mr-3"></i>
+                <span class="font-bold text-lg tracking-wide">BugSquash</span>
+            </div>
+            <!-- Close button for mobile -->
+            <button onclick="app.toggleSidebar()" class="md:hidden text-slate-400 hover:text-white transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 py-6 px-3 space-y-1">
+            <button onclick="app.setView('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-center bg-slate-800 text-white">
+                <i class="fa-solid fa-chart-pie w-6 text-center mr-2 text-sm"></i> Dashboard
+            </button>
+            <button onclick="app.setView('issues')" id="nav-issues" class="nav-item w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center">
+                <i class="fa-solid fa-list-check w-6 text-center mr-2 text-sm"></i> All Issues
+            </button>
+            <button onclick="app.setView('board')" id="nav-board" class="nav-item w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center">
+                <i class="fa-solid fa-columns w-6 text-center mr-2 text-sm"></i> Kanban Board
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-xs font-bold">JD</div>
+                <div>
+                    <p class="text-sm font-medium">John Doe</p>
+                    <p class="text-xs text-slate-500">Admin</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 z-10">
+            <div class="flex items-center md:hidden">
+                <!-- Added onclick handler -->
+                <button onclick="app.toggleSidebar()" class="text-gray-500 hover:text-gray-700 mr-4">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <span class="font-bold text-lg text-slate-900">BugSquash</span>
+            </div>
+
+            <div class="hidden md:flex items-center text-gray-400 text-sm">
+                <span id="page-title">Dashboard</span>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="global-search" placeholder="Search issues..." class="pl-8 pr-4 py-1.5 bg-gray-100 border-none rounded-full text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all w-32 md:w-64 outline-none">
+                </div>
+                <button onclick="app.openModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">New Issue</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Container -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 relative">
+            <!-- Content injected via JS -->
+        </div>
+
+    </main>
+
+    <!-- Create Ticket Modal -->
+    <div id="modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="app.closeModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-xl shadow-2xl p-6 animate-slide-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Create New Issue</h2>
+                <button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <form id="create-ticket-form" onsubmit="app.handleSubmit(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" name="title" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="e.g., Login page crashing on Safari">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                            <select name="priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+                            <select name="assignee" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                <option value="Unassigned">Unassigned</option>
+                                <option value="John Doe">John Doe</option>
+                                <option value="Sarah Smith">Sarah Smith</option>
+                                <option value="Mike Johnson">Mike Johnson</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none transition-all resize-none" placeholder="Describe the bug details..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="app.closeModal()" class="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 transition-colors shadow-md">Create Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-3">
+        <i class="fa-solid fa-check-circle text-green-400"></i>
+        <span id="toast-message">Action successful</span>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        /**
+         * ==========================================
+         * MODEL: Data Management
+         * Handles data storage, retrieval, and updates
+         * ==========================================
+         */
+        class TicketStore {
+            constructor() {
+                this.tickets = [
+                    { id: 'BUG-101', title: 'Homepage hero image alignment', description: 'The image is shifted 20px left on mobile devices.', priority: 'Medium', status: 'Open', assignee: 'Sarah Smith', date: '2023-10-24' },
+                    { id: 'BUG-102', title: 'API connection timeout', description: 'Backend returns 504 on large payloads.', priority: 'Critical', status: 'In Progress', assignee: 'Mike Johnson', date: '2023-10-25' },
+                    { id: 'BUG-103', title: 'Update copyright year', description: 'Footer still says 2022.', priority: 'Low', status: 'Closed', assignee: 'John Doe', date: '2023-10-20' },
+                    { id: 'BUG-104', title: 'Auth token expiry issue', description: 'User is not logged out when token expires.', priority: 'High', status: 'Open', assignee: 'Unassigned', date: '2023-10-26' },
+                    { id: 'BUG-105', title: 'Dark mode contrast fix', description: 'Text is unreadable on modal inputs.', priority: 'Medium', status: 'In Progress', assignee: 'Sarah Smith', date: '2023-10-26' },
+                ];
+            }
+
+            getAll() { return this.tickets; }
+
+            search(query) {
+                if (!query) return this.tickets;
+                const lower = query.toLowerCase();
+                return this.tickets.filter(t => 
+                    t.title.toLowerCase().includes(lower) || 
+                    t.id.toLowerCase().includes(lower) ||
+                    t.assignee.toLowerCase().includes(lower)
+                );
+            }
+
+            add(ticketData) {
+                const newTicket = {
+                    id: `BUG-${100 + this.tickets.length + 1}`,
+                    ...ticketData,
+                    status: 'Open',
+                    date: new Date().toISOString().split('T')[0]
+                };
+                this.tickets.unshift(newTicket);
+                return newTicket;
+            }
+
+            remove(id) {
+                this.tickets = this.tickets.filter(t => t.id !== id);
+            }
+
+            updateStatus(id, status) {
+                const ticket = this.tickets.find(t => t.id === id);
+                if (ticket) ticket.status = status;
+                return ticket;
+            }
+
+            getStats() {
+                return {
+                    total: this.tickets.length,
+                    open: this.tickets.filter(t => t.status === 'Open').length,
+                    progress: this.tickets.filter(t => t.status === 'In Progress').length,
+                    closed: this.tickets.filter(t => t.status === 'Closed').length,
+                    critical: this.tickets.filter(t => t.priority === 'Critical' && t.status !== 'Closed').length
+                };
+            }
+        }
+
+        /**
+         * ==========================================
+         * VIEW: UI Rendering
+         * Handles HTML string generation and visual helpers
+         * ==========================================
+         */
+        class TicketView {
+            static getInitials(name) {
+                if(name === 'Unassigned') return '?';
+                return name.split(' ').map(n => n[0]).join('').substring(0, 2);
+            }
+
+            static getPriorityClasses(p) {
+                const colors = {
+                    'Critical': { text: 'text-red-600', bg: 'bg-red-50', fullBg: 'bg-red-500', border: 'border-red-200 bg-red-50' },
+                    'High': { text: 'text-orange-500', bg: 'bg-orange-50', fullBg: 'bg-orange-500', border: 'border-orange-200 bg-orange-50' },
+                    'Medium': { text: 'text-blue-500', bg: 'bg-blue-50', fullBg: 'bg-blue-500', border: 'border-blue-200 bg-blue-50' },
+                    'Low': { text: 'text-gray-500', bg: 'bg-gray-100', fullBg: 'bg-gray-400', border: 'border-gray-200 bg-gray-50' }
+                };
+                return colors[p] || colors['Low'];
+            }
+
+            static getStatusBadge(s) {
+                const styles = {
+                    'Open': 'bg-red-100 text-red-700',
+                    'In Progress': 'bg-yellow-100 text-yellow-700',
+                    'Closed': 'bg-green-100 text-green-700'
+                };
+                return styles[s] || 'bg-gray-100 text-gray-700';
+            }
+
+            static renderDashboard(stats, recentTickets) {
+                // Helper for stat cards
+                const card = (title, count, icon, color) => `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:translate-y-[-2px] transition-transform duration-200">
+                        <div><p class="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">${title}</p><h2 class="text-2xl font-bold text-gray-800">${count}</h2></div>
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl ${color}"><i class="fa-solid ${icon}"></i></div>
+                    </div>`;
+
+                // Helper for activity items
+                const activityItem = (t) => `
+                    <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-100 cursor-pointer" onclick="app.setView('issues')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center ${this.getPriorityClasses(t.priority).bg}">
+                                <i class="fa-solid fa-bug ${this.getPriorityClasses(t.priority).text}"></i>
+                            </div>
+                            <div><h4 class="font-medium text-sm text-gray-900">${t.title}</h4><p class="text-xs text-gray-500">${t.id} • ${t.assignee}</p></div>
+                        </div>
+                        <span class="text-xs font-semibold px-2 py-1 rounded-full ${this.getStatusBadge(t.status)}">${t.status}</span>
+                    </div>`;
+
+                return `
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-fade-in">
+                        ${card('Total Issues', stats.total, 'fa-clipboard-list', 'bg-blue-50 text-blue-600')}
+                        ${card('Open', stats.open, 'fa-circle-exclamation', 'bg-red-50 text-red-600')}
+                        ${card('In Progress', stats.progress, 'fa-spinner', 'bg-yellow-50 text-yellow-600')}
+                        ${card('Resolved', stats.closed, 'fa-check-circle', 'bg-green-50 text-green-600')}
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">Recent Issues</h3>
+                            <div class="space-y-4">${recentTickets.map(t => activityItem(t)).join('')}</div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">Priority Breakdown</h3>
+                            <div class="mt-8 bg-brand-50 rounded-lg p-4 border border-brand-100">
+                                <p class="text-xs text-brand-800 font-medium mb-1">System Status</p>
+                                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div><span class="text-sm font-bold text-brand-900">All Systems Operational</span></div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            static renderList(tickets) {
+                if (tickets.length === 0) return `<div class="p-8 text-center text-gray-500">No tickets found.</div>`;
+                
+                const rows = tickets.map(t => `
+                    <tr class="hover:bg-gray-50 group transition-colors">
+                        <td class="p-4"><div class="flex flex-col"><span class="font-medium text-gray-900 text-sm">${t.title}</span><span class="text-xs text-gray-400">${t.id}</span></div></td>
+                        <td class="p-4"><select onchange="app.updateStatus('${t.id}', this.value)" class="text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer outline-none bg-transparent ${this.getStatusBadge(t.status)}">
+                            ${['Open', 'In Progress', 'Closed'].map(s => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select></td>
+                        <td class="p-4"><span class="flex items-center gap-1.5 text-xs font-medium ${this.getPriorityClasses(t.priority).text}"><i class="fa-solid fa-circle text-[6px]"></i> ${t.priority}</span></td>
+                        <td class="p-4"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">${this.getInitials(t.assignee)}</div><span class="text-sm text-gray-600">${t.assignee}</span></div></td>
+                        <td class="p-4 text-right"><button onclick="app.deleteTicket('${t.id}')" class="text-gray-400 hover:text-red-500 transition-colors p-2"><i class="fa-solid fa-trash-can"></i></button></td>
+                    </tr>`).join('');
+
+                return `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+                        <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                            <thead><tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
+                                <th class="p-4 font-semibold">Issue</th><th class="p-4 font-semibold">Status</th><th class="p-4 font-semibold">Priority</th><th class="p-4 font-semibold">Assignee</th><th class="p-4 font-semibold text-right">Actions</th>
+                            </tr></thead>
+                            <tbody class="divide-y divide-gray-100">${rows}</tbody>
+                        </table></div>
+                    </div>`;
+            }
+
+            static renderBoard(tickets, nextStatusFn, prevStatusFn) {
+                const cols = ['Open', 'In Progress', 'Closed'];
+                return `
+                    <div class="flex flex-col md:flex-row gap-6 h-full overflow-x-auto pb-4 animate-fade-in">
+                        ${cols.map(status => {
+                            const items = tickets.filter(t => t.status === status);
+                            const borderCol = status === 'Open' ? 'border-t-blue-500' : status === 'In Progress' ? 'border-t-yellow-500' : 'border-t-green-500';
+                            return `
+                                <div class="flex-1 min-w-[300px] bg-gray-100 rounded-xl p-4 flex flex-col h-full max-h-full">
+                                    <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-200 ${borderCol} border-t-4 pt-2">
+                                        <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">${status}</h3>
+                                        <span class="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">${items.length}</span>
+                                    </div>
+                                    <div class="space-y-3 overflow-y-auto pr-1 custom-scrollbar flex-1">
+                                        ${items.map(t => `
+                                            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow group relative">
+                                                <div class="flex justify-between items-start mb-2"><span class="text-xs font-mono text-gray-400">${t.id}</span></div>
+                                                <h4 class="font-medium text-sm text-gray-900 mb-3 leading-snug">${t.title}</h4>
+                                                <div class="flex items-center justify-between mt-4">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[9px] font-bold text-gray-500">${this.getInitials(t.assignee)}</div>
+                                                        <span class="text-[10px] px-2 py-0.5 rounded border ${this.getPriorityClasses(t.priority).border} text-gray-600">${t.priority}</span>
+                                                    </div>
+                                                    <div class="flex gap-1">
+                                                        ${status !== 'Open' ? `<button onclick="app.updateStatus('${t.id}', '${prevStatusFn(status)}')" class="text-gray-300 hover:text-blue-500 p-1"><i class="fa-solid fa-arrow-left"></i></button>` : ''}
+                                                        ${status !== 'Closed' ? `<button onclick="app.updateStatus('${t.id}', '${nextStatusFn(status)}')" class="text-gray-300 hover:text-blue-500 p-1"><i class="fa-solid fa-arrow-right"></i></button>` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>`).join('')}
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>`;
+            }
+        }
+
+        /**
+         * ==========================================
+         * CONTROLLER: Application Logic
+         * Connects Model & View, Handles Interactions
+         * ==========================================
+         */
+        class BugTrackerApp {
+            constructor() {
+                this.store = new TicketStore();
+                this.currentView = 'dashboard';
+                this.searchQuery = '';
+                
+                this.bindGlobalEvents();
+                this.render();
+            }
+
+            bindGlobalEvents() {
+                document.getElementById('global-search').addEventListener('input', (e) => {
+                    this.searchQuery = e.target.value;
+                    if(this.currentView === 'dashboard') this.setView('issues');
+                    else this.render();
+                });
+            }
+
+            // --- Navigation ---
+
+            setView(viewName) {
+                this.currentView = viewName;
+                
+                // Close sidebar on mobile when navigating
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
+                    this.toggleSidebar();
+                }
+                
+                // Update Sidebar UI
+                document.querySelectorAll('.nav-item').forEach(el => {
+                    el.classList.remove('bg-slate-800', 'text-white');
+                    el.classList.add('text-slate-400');
+                });
+                const activeId = `nav-${viewName === 'board' ? 'board' : viewName === 'dashboard' ? 'dashboard' : 'issues'}`;
+                const activeNav = document.getElementById(activeId);
+                if(activeNav) {
+                    activeNav.classList.add('bg-slate-800', 'text-white');
+                    activeNav.classList.remove('text-slate-400');
+                }
+
+                // Update Header
+                const titles = { 'dashboard': 'Dashboard', 'issues': 'All Issues', 'board': 'Kanban Board' };
+                document.getElementById('page-title').innerText = titles[viewName];
+
+                this.render();
+            }
+
+            // --- UI Actions ---
+            
+            toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                
+                if (sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.remove('-translate-x-full');
+                    overlay.classList.remove('hidden');
+                } else {
+                    sidebar.classList.add('-translate-x-full');
+                    overlay.classList.add('hidden');
+                }
+            }
+
+            // --- CRUD Operations (Called by View) ---
+
+            handleSubmit(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = {
+                    title: formData.get('title'),
+                    description: formData.get('description'),
+                    priority: formData.get('priority'),
+                    assignee: formData.get('assignee')
+                };
+
+                const newTicket = this.store.add(data);
+                this.closeModal();
+                this.render();
+                this.showToast(`Issue ${newTicket.id} Created`);
+            }
+
+            deleteTicket(id) {
+                if(confirm('Are you sure you want to delete this ticket?')) {
+                    this.store.remove(id);
+                    this.render();
+                    this.showToast('Issue Deleted');
+                }
+            }
+
+            updateStatus(id, newStatus) {
+                const ticket = this.store.updateStatus(id, newStatus);
+                if (ticket) {
+                    this.render();
+                    this.showToast(`Status updated to ${newStatus}`);
+                }
+            }
+
+            openModal() { document.getElementById('modal').classList.remove('hidden'); }
+            
+            closeModal() { 
+                document.getElementById('modal').classList.add('hidden');
+                document.getElementById('create-ticket-form').reset();
+            }
+
+            showToast(msg) {
+                const toast = document.getElementById('toast');
+                document.getElementById('toast-message').innerText = msg;
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+            }
+
+            // --- Main Render Loop ---
+
+            render() {
+                const container = document.getElementById('content-area');
+                container.innerHTML = '';
+
+                if (this.currentView === 'dashboard') {
+                    const stats = this.store.getStats();
+                    const recent = this.store.getAll().slice(0, 4);
+                    container.innerHTML = TicketView.renderDashboard(stats, recent);
+                } else {
+                    const tickets = this.store.search(this.searchQuery);
+                    
+                    if (this.currentView === 'issues') {
+                        container.innerHTML = TicketView.renderList(tickets);
+                    } else if (this.currentView === 'board') {
+                        container.innerHTML = TicketView.renderBoard(
+                            tickets, 
+                            (curr) => curr === 'Open' ? 'In Progress' : 'Closed', // Next Status
+                            (curr) => curr === 'Closed' ? 'In Progress' : 'Open' // Prev Status
+                        );
+                    }
+                }
+            }
+        }
+
+        // Initialize
+        const app = new BugTrackerApp();
+    </script>
+</body>
+</html>
